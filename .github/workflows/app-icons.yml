@@ -1,0 +1,43 @@
+name: Opret appikoner
+on:
+  push:
+    paths:
+      - '.github/workflows/app-icons.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  icons:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Opret PNG-ikoner uden eksterne biblioteker
+        run: |
+          python3 - <<'PY'
+          import os,struct,zlib,math
+          os.makedirs('icons',exist_ok=True)
+          def png(n,path):
+              rows=[]
+              for y in range(n):
+                  row=bytearray([0])
+                  for x in range(n):
+                      X=(x+.5)/n;Y=(y+.5)/n
+                      color=(23,43,33)
+                      if ((X-.5)/.35)**2+((Y-.46)/.35)**2<1: color=(248,245,236)
+                      if ((X-.5)/.285)**2+((Y-.46)/.285)**2<1: color=(236,120,67)
+                      if ((X-.5)/.235)**2+((Y-.47)/.20)**2<1: color=(246,203,139)
+                      if abs(X-.5)<.12 and .77<Y<.80: color=(248,245,236)
+                      row.extend((*color,255))
+                  rows.append(bytes(row))
+              def chunk(tag,data):return struct.pack('!I',len(data))+tag+data+struct.pack('!I',zlib.crc32(tag+data)&0xffffffff)
+              raw=b''.join(rows)
+              data=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('!2I5B',n,n,8,6,0,0,0))+chunk(b'IDAT',zlib.compress(raw,9))+chunk(b'IEND',b'')
+              open(path,'wb').write(data)
+          for n in (192,512):png(n,f'icons/icon-{n}.png')
+          PY
+      - name: Gem ikoner i GitHub
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add icons/icon-192.png icons/icon-512.png
+          git diff --cached --quiet || (git commit -m "Tilfoej PNG appikoner" && git push)
